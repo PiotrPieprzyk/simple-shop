@@ -172,7 +172,8 @@ simple-shop/
         - A **function URL**.
     - `cdn.tf`, the CloudFront distribution:
         - Behavior `_next/static/*` → S3, managed policy *CachingOptimized*.
-        - One behavior per top-level entry in `public/` (e.g. `favicon.ico`) → S3.
+        - One behavior per top-level entry in `public/` (e.g. `favicon.ico`) → S3. The list is `static_paths` in
+          `terraform.tfvars`; `deploy.mjs` warns when it doesn't match the build.
         - Default behavior `*` → Lambda function URL with *CachingDisabled* to start, origin request policy
           *AllViewerExceptHostHeader*, and all HTTP methods allowed (POST is needed for Server Actions and PayU).
         - A **CloudFront Function** (viewer request) that copies `Host` into `x-forwarded-host`. Next.js needs the
@@ -194,8 +195,9 @@ simple-shop/
       (e.g. `x-origin-verify: <random>`).
     - A check in `proxy.ts` (Next.js 16's replacement for `middleware.ts`) rejects requests without that header, so the raw
       `*.lambda-url.*` address can't be used to bypass CloudFront.
-    - Generate the value with an `ephemeral "random_password"` written only to SSM (`value_wo`), as tic-tac-toe does.
-      Accepted trade-off: the CloudFront origin config does store it in the Terraform state.
+    - Generate the value with a `random_password` written to SSM with `value_wo`. It can't be `ephemeral` as in
+      tic-tac-toe, because the CloudFront origin config (an ordinary attribute) needs it too. Accepted trade-off:
+      the value is in the Terraform state.
 5. **Secrets at runtime**
     - On a cold start, `getConfig()` reads the SSM parameters (`GetParameters` with decryption) and caches them per
       Lambda instance.

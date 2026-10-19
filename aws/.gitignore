@@ -1,0 +1,18 @@
+# Provider plugins and module cache, recreated by `terraform init`.
+.terraform/
+
+# State. infra/ keeps it in S3; bootstrap/ keeps it locally on purpose (see README).
+*.tfstate
+*.tfstate.*
+
+# Saved plans can contain secrets in plain text.
+*.tfplan
+tfplan
+
+crash.log
+crash.*.log
+
+# Personal overrides (e.g. secrets.auto.tfvars). terraform.tfvars is committed: it holds no secrets.
+*.auto.tfvars
+override.tf
+*_override.tf
