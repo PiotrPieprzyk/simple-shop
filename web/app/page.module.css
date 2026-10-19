@@ -1,0 +1,29 @@
+.main {
+  width: 100%;
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 4rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1.5rem;
+}
+
+.main p {
+  line-height: 1.6;
+  white-space: pre-line;
+}
+
+.error {
+  color: #b42318;
+}
+
+.button {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 0.5rem;
+  background: var(--foreground);
+  color: var(--background);
+  font: inherit;
+  cursor: pointer;
+}
