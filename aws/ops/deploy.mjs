@@ -130,6 +130,22 @@ async function smokeTest() {
         throw new Error(`${tf().function_url} answered ${direct.status}, expected 403. Check web/proxy.ts.`);
     }
     console.log(`${tf().function_url}: 403 (CloudFront only)`);
+
+    // PayU notifications with a wrong signature must be rejected (web/lib/payu-notify.ts).
+    const notifyUrl = `${appUrl}/api/payu/notify`;
+    const notify = await fetch(notifyUrl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'OpenPayu-Signature': 'sender=checkout;signature=00000000000000000000000000000000;algorithm=MD5;content=DOCUMENT',
+        },
+        body: JSON.stringify({order: {orderId: 'SMOKETEST', status: 'COMPLETED'}}),
+        redirect: 'manual',
+    });
+    if (notify.status !== 400) {
+        throw new Error(`${notifyUrl} answered ${notify.status} to a bad signature, expected 400.`);
+    }
+    console.log(`${notifyUrl}: 400 for a bad signature`);
 }
 
 main(async () => {

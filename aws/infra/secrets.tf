@@ -14,9 +14,35 @@ resource "aws_ssm_parameter" "sanity_dataset" {
   value = var.sanity_dataset
 }
 
-# The Sanity read token is NOT managed here, so its value never enters the Terraform state. It's
-# set once with `aws ssm put-parameter --type SecureString` (README.md). Terraform only knows its
-# name (locals.tf), and the IAM policy (server.tf) covers it through the /simple-shop/* prefix.
+resource "aws_ssm_parameter" "app_url" {
+  name        = local.params.app_url
+  description = "Public URL of the shop, for PayU's notifyUrl and continueUrl"
+  type        = "String"
+  value       = "https://${var.domain}"
+}
+
+resource "aws_ssm_parameter" "payu_base_url" {
+  name  = local.params.payu_base_url
+  type  = "String"
+  value = var.payu_base_url
+}
+
+resource "aws_ssm_parameter" "payu_pos_id" {
+  name  = local.params.payu_pos_id
+  type  = "String"
+  value = var.payu_pos_id
+}
+
+resource "aws_ssm_parameter" "payu_client_id" {
+  name  = local.params.payu_client_id
+  type  = "String"
+  value = var.payu_client_id
+}
+
+# The Sanity read token and the PayU client secret and second key are NOT managed here, so their
+# values never enter the Terraform state. They're set once with
+# `aws ssm put-parameter --type SecureString` (README.md). Terraform only knows their names
+# (locals.tf), and the IAM policy (server.tf) covers them through the /simple-shop/* prefix.
 
 # The secret CloudFront sends as the x-origin-verify header, so the public function URL can't be
 # used to bypass CloudFront (ROADMAP.md, Milestone 2, "Function URL protection").

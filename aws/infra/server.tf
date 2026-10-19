@@ -22,7 +22,8 @@ resource "aws_iam_role" "server" {
   assume_role_policy = data.aws_iam_policy_document.lambda_trust.json
 }
 
-# Permissions policy: WHAT the role may do. Write its own logs and read the project's parameters.
+# Permissions policy: WHAT the role may do. Write its own logs and read the project's parameters
+# (Sanity, PayU under /simple-shop/payu/*, the origin secret).
 # SecureStrings use the AWS-managed aws/ssm key, which needs no extra kms:Decrypt grant.
 # M4 and M5 add DynamoDB and SES here.
 data "aws_iam_policy_document" "server" {

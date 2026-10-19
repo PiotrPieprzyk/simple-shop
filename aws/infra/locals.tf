@@ -19,6 +19,12 @@ locals {
     sanity_dataset        = "${local.ssm_prefix}/sanity/dataset"
     sanity_api_read_token = "${local.ssm_prefix}/sanity/api-read-token" # set with the AWS CLI, see README.md
     origin_verify         = "${local.ssm_prefix}/origin-verify"
+    app_url               = "${local.ssm_prefix}/app-url"
+    payu_base_url         = "${local.ssm_prefix}/payu/base-url"
+    payu_pos_id           = "${local.ssm_prefix}/payu/pos-id"
+    payu_client_id        = "${local.ssm_prefix}/payu/client-id"
+    payu_client_secret    = "${local.ssm_prefix}/payu/client-secret" # set with the AWS CLI, see README.md
+    payu_second_key       = "${local.ssm_prefix}/payu/second-key"    # set with the AWS CLI, see README.md
   }
 
   # The header CloudFront adds to every request to the server function (web/proxy.ts checks it).

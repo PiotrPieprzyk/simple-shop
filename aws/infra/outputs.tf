@@ -3,7 +3,7 @@ output "app_url" {
 }
 
 output "next_step" {
-  value = "Put the Sanity token into SSM (README.md, first-time setup), then deploy: node aws/ops/deploy.mjs"
+  value = "Put the Sanity token and the PayU secrets into SSM (README.md, first-time setup), then deploy: node aws/ops/deploy.mjs"
 }
 
 # ---------------------------------------------------------------- read by aws/ops/*.mjs

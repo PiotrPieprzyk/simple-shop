@@ -64,6 +64,24 @@ variable "sanity_dataset" {
   default = "production"
 }
 
+# ---------------------------------------------------------------- PayU (not secret; client secret and second key are set with the AWS CLI)
+
+variable "payu_base_url" {
+  description = "PayU REST API. Switching to production (https://secure.payu.com) is a config change."
+  type        = string
+  default     = "https://secure.snd.payu.com"
+}
+
+variable "payu_pos_id" {
+  description = "PayU POS ID (merchantPosId), from the PayU panel: Online payments → My shops → POS."
+  type        = string
+}
+
+variable "payu_client_id" {
+  description = "OAuth client_id of the same POS (usually equal to the POS ID)."
+  type        = string
+}
+
 # ---------------------------------------------------------------- Cloudflare
 
 variable "cloudflare_zone_id" {

@@ -4,7 +4,7 @@ A small shop for an artist selling a few mostly one-of-a-kind products. See [ROA
 
 | Folder    | What it is                                                                   |
 |-----------|------------------------------------------------------------------------------|
-| `web/`    | Next.js app (server-rendered pages and, later, Route Handlers)               |
+| `web/`    | Next.js app (server-rendered pages, Route Handlers for checkout and PayU)    |
 | `studio/` | Sanity Studio (content schemas). Deployed to `*.sanity.studio`, never to AWS |
 | `aws/`    | Terraform (`bootstrap/`, `infra/`) and Node deploy scripts (`ops/`). See [Deploying to AWS](#deploying-to-aws) |
 
@@ -17,9 +17,10 @@ A small shop for an artist selling a few mostly one-of-a-kind products. See [ROA
 
 ```sh
 cd web
-cp .env.example .env.local   # then fill in the values, see "Setting up Sanity"
+cp .env.example .env.local   # then fill in the values, see "Setting up Sanity" and "Setting up PayU"
 npm install
 npm run dev                  # http://localhost:3000
+npm test                     # unit tests (Vitest)
 ```
 
 The home page shows the `homePage` document from Sanity. If the configuration or token is missing or wrong, the page
@@ -61,6 +62,34 @@ shows "Content unavailable". In development it also shows the reason, and the se
    origins, `http://localhost:3333` and the `*.sanity.studio` host, are added by Sanity.)
 8. To rotate the token: create a new one, update `web/.env.local` and SSM (see
    [Rotating secrets](#rotating-secrets)), redeploy, then delete the old one.
+
+## Setting up PayU (sandbox)
+
+The **Buy** button posts to `/api/checkout`, which creates a PayU order for a fixed test product (10.00 zł, set on
+the server) and redirects the browser to PayU's payment page. PayU then sends the buyer back to `/payment/return`,
+which only says "in progress or done": the payment state comes only from PayU's notification to `/api/payu/notify`.
+Its `OpenPayu-Signature` is verified with the second key, and the order is fetched again from PayU before its status
+is trusted.
+
+1. **For a first local try**, PayU's public sandbox test POS works. Its values are in `web/.env.example` (POS
+   `300746`). PayU can't reach `localhost`, so notifications never arrive locally; the signature check and the
+   notification handler are covered by `npm test` with a recorded notification (`web/test/fixtures/`).
+2. **Your own sandbox POS**, for the deployed app: register through <https://secure.snd.payu.com> (*Register*). In
+   the sandbox panel, *Online payments → My shops → your shop → POS* shows the four values under *Configuration keys*:
+
+   | PayU panel           | Local (`web/.env.local`) | AWS                                           |
+   |----------------------|--------------------------|-----------------------------------------------|
+   | POS ID (`pos_id`)    | `PAYU_POS_ID`            | `payu_pos_id` in `aws/infra/terraform.tfvars` |
+   | OAuth `client_id`    | `PAYU_CLIENT_ID`         | `payu_client_id` in `terraform.tfvars`        |
+   | OAuth `client_secret`| `PAYU_CLIENT_SECRET`     | SSM `/simple-shop/payu/client-secret` (CLI)   |
+   | Second key (MD5)     | `PAYU_SECOND_KEY`        | SSM `/simple-shop/payu/second-key` (CLI)      |
+
+   The base URL is `https://secure.snd.payu.com` (`PAYU_BASE_URL`, Terraform `payu_base_url`), so switching to
+   production later is a config change. Until you have your own POS, `terraform.tfvars` uses the public test POS.
+3. **Paying in the sandbox:** pick a test bank transfer and choose a successful outcome, or use a test card from
+   PayU's docs (*Testing → Sandbox*). Then check the notification in the logs: `node aws/ops/logs.mjs --since 10m`
+   should show `PayU notification verified: … COMPLETED`. A repeated notification is logged as `duplicate` (tracked in
+   memory per Lambda instance until Milestone 4 stores orders in DynamoDB).
 
 ## Query types (TypeGen)
 
@@ -137,15 +166,20 @@ config of their own.
 
    The Lambda function starts with placeholder code that answers 503.
 
-3. **The Sanity token in SSM.** Terraform creates the other parameters, but never this one, so its value stays out of
-   the Terraform state. Use a token with the **Viewer** role (see [Setting up Sanity](#setting-up-sanity)):
+3. **Secrets in SSM.** Terraform creates the other parameters, but never these three, so their values stay out of the
+   Terraform state. Use a Sanity token with the **Viewer** role (see [Setting up Sanity](#setting-up-sanity)) and the
+   PayU values of the POS in `terraform.tfvars` (see [Setting up PayU](#setting-up-payu-sandbox)):
 
    ```sh
    # Git Bash. MSYS_NO_PATHCONV stops Git Bash from turning /simple-shop/... into a Windows path.
-   read -rsp "Sanity token: " TOKEN && echo
-   MSYS_NO_PATHCONV=1 aws ssm put-parameter --name /simple-shop/sanity/api-read-token \
-     --type SecureString --overwrite --value "$TOKEN"
-   unset TOKEN
+   put_secret() {
+     read -rsp "$1: " VALUE && echo
+     MSYS_NO_PATHCONV=1 aws ssm put-parameter --name "$2" --type SecureString --overwrite --value "$VALUE" > /dev/null
+     unset VALUE
+   }
+   put_secret "Sanity token"       /simple-shop/sanity/api-read-token
+   put_secret "PayU client secret" /simple-shop/payu/client-secret
+   put_secret "PayU second key"    /simple-shop/payu/second-key
    ```
 
 4. **Deploy** from the repository root:
@@ -156,7 +190,8 @@ config of their own.
 
    It builds `web/` with OpenNext, uploads the assets to S3 (before the code, so new pages never reference missing
    files), updates the Lambda code and publishes a version named after the git commit, invalidates CloudFront, and
-   runs a smoke test: the site must answer 200 with content, and the function URL called directly must answer 403.
+   runs a smoke test: the site must answer 200 with content, the function URL called directly must answer 403, and
+   `POST /api/payu/notify` with a bad signature must answer 400.
 
 ### Commands
 
@@ -192,8 +227,10 @@ Lambda instance. The Lambda environment holds only that prefix, never values.
 
 ### Rotating secrets
 
-- **Sanity token:** run step 3 of the first-time setup with the new token, then `node aws/ops/deploy.mjs --skip-build`
-  (a code update starts new Lambda instances, which read SSM again). Then delete the old token in Sanity.
+- **Sanity token, PayU client secret or second key:** run the matching `put_secret` line of step 3 of the first-time
+  setup, then `node aws/ops/deploy.mjs --skip-build` (a code update starts new Lambda instances, which read SSM again).
+  Then delete the old Sanity token. When switching to another PayU POS, also change `payu_pos_id` and `payu_client_id`
+  in `terraform.tfvars` and run `terraform apply` before the redeploy.
 - **Origin secret:** bump `origin_verify_version` in `terraform.tfvars`, `terraform apply`, then
   `node aws/ops/deploy.mjs --skip-build`. Until the redeploy, running instances still expect the old value and answer
   403; CloudFront also takes a few minutes to roll out the new header.
@@ -217,10 +254,11 @@ terraform destroy
 ```
 
 This removes the distribution, the bucket (with its files), the function, the certificate, the DNS records and the
-SSM parameters Terraform created. The Sanity token parameter isn't managed by Terraform; delete it yourself:
+SSM parameters Terraform created. The secret parameters aren't managed by Terraform; delete them yourself:
 
 ```sh
-MSYS_NO_PATHCONV=1 aws ssm delete-parameter --name /simple-shop/sanity/api-read-token
+MSYS_NO_PATHCONV=1 aws ssm delete-parameters --names /simple-shop/sanity/api-read-token \
+  /simple-shop/payu/client-secret /simple-shop/payu/second-key
 ```
 
 The state bucket is protected by `prevent_destroy` (`aws/bootstrap/main.tf`). To remove it too, delete that line, then

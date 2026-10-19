@@ -1,3 +1,4 @@
+import { formatPrice, TEST_PRODUCT } from "@/lib/product";
 import { getHomePage, type HomePage } from "@/lib/sanity";
 import styles from "./page.module.css";
 
@@ -25,10 +26,15 @@ export default async function Home() {
     <main className={styles.main}>
       <h1>{homePage.title}</h1>
       <p>{homePage.paragraph}</p>
-      {/* Starts a PayU payment from Milestone 3 on. */}
-      <button type="button" className={styles.button}>
-        Buy
-      </button>
+      {/* A plain form POST: /api/checkout redirects to PayU's payment page. */}
+      <form method="post" action="/api/checkout">
+        <p>
+          {TEST_PRODUCT.name}: {formatPrice(TEST_PRODUCT.price)}
+        </p>
+        <button type="submit" className={styles.button}>
+          Buy
+        </button>
+      </form>
     </main>
   );
 }
